@@ -1,0 +1,13 @@
+{
+  "name": "Nyxcord - GIF & Sticker Maker",
+  "short_name": "Nyxcord",
+  "description": "Create Discord-ready GIFs and stickers privately in your browser.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#111318",
+  "theme_color": "#5865F2",
+  "icons": [
+    {"src": "/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "/icon-512.png", "sizes": "512x512", "type": "image/png"}
+  ]
+}
