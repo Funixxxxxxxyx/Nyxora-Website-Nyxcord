@@ -17,24 +17,7 @@ declare module 'gifenc' {
         bytes(): Uint8Array;
     };
 }
-declare module 'gifuct-js' {
-    export function parseGIF(buffer: ArrayBuffer): {
-        frames?: unknown[];
-        lsd: {
-            width: number;
-            height: number;
-        };
-    };
-    type GifFrame = {
-        dims: { left: number; top: number; width: number; height: number };
-        pixels: Uint8Array;
-        delay: number;
-        disposalType: number;
-    };
-    export function decompressFrames(parsed: unknown, buildPatch: true): Array<GifFrame & { patch: Uint8ClampedArray }>;
-    export function decompressFrames(parsed: unknown, buildPatch: false): Array<GifFrame>;
-
-}
+// gifuct-js supplies its own TypeScript definitions.
 declare module 'upng-js' {
     const UPNG: {
         encode(imgs: ArrayBuffer[], width: number, height: number, colors: number, delays?: number[]): ArrayBuffer;
