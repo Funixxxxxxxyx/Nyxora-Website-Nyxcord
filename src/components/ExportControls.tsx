@@ -83,7 +83,7 @@ export default function ExportControls({
         <CircleAlert size={16}/><span>{state.error}</span>
       </div>}
       {!working && <div className="export-hint">
-        <ShieldCheck size={14}/> Local processing · time depends on file and device
+        <ShieldCheck size={14}/> Export time depends on the clip and device
       </div>}
     </div>
 

@@ -16,7 +16,13 @@ export type LoadedMedia = {
 const MAX_FILE_MB = 160;
 const mimeIsVideo = (file: File) => file.type.startsWith('video/') || /\.(mp4|mov|m4v|webm|ogv)$/i.test(file.name);
 const isGif = (file: File) => file.type === 'image/gif' || /\.gif$/i.test(file.name);
-const isImage = (file: File) => file.type.startsWith('image/') || /\.(png|jpe?g|webp|bmp|avif)$/i.test(file.name);
+const isImage = (file: File) => {
+    // SVG and other browser-rendered documents are not part of the raster editor.
+    if (file.type && !['image/png', 'image/jpeg', 'image/webp', 'image/bmp', 'image/avif', 'application/octet-stream'].includes(file.type))
+        return false;
+    return /\.(png|jpe?g|webp|bmp|avif)$/i.test(file.name) ||
+        ['image/png', 'image/jpeg', 'image/webp', 'image/bmp', 'image/avif'].includes(file.type);
+};
 export function formatTime(sec: number): string {
     const m = Math.floor(Math.max(0, sec) / 60);
     const s = Math.floor(Math.max(0, sec) % 60);
@@ -281,6 +287,12 @@ export function disposeMedia(media: LoadedMedia | null): void {
     }
     URL.revokeObjectURL(media.url);
     media.gifFrames = undefined;
+    if (media.gifCanvas) {
+        media.gifCanvas.width = 0;
+        media.gifCanvas.height = 0;
+        media.gifContext = undefined;
+        media.gifCanvas = undefined;
+    }
 }
 export function drawSource(ctx: CanvasRenderingContext2D, media: LoadedMedia, time: number, x: number, y: number, width: number, height: number): void {
     if (media.gifFrames?.length && media.gifCanvas && media.gifContext) {

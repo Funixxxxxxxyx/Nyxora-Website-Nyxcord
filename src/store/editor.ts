@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { rotatedSize } from '../lib/rotation';
 export type Mode = 'gif' | 'sticker';
-export type Tool = 'crop' | 'trim' | 'resize';
+export type Tool = 'crop' | 'trim' | 'resize' | 'text';
 export type Rotation = 0 | 90 | 180 | 270;
 export type Ratio = 'free' | 'original' | '1:1' | '16:9' | '4:3' | '9:16';
 export type Rect = {

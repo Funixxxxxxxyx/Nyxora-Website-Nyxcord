@@ -2,7 +2,7 @@
 
 Nyxcord is a browser-based GIF and sticker editor with a minimal-brutalist interface inspired by Discord's dark palette. It supports crop, trim, rotate, resize, preview, compression, and download.
 
-This repository's **documentation-only distribution** contains `README.md`, `HANDOFF.md`, and `.gitignore`. It does not contain application source code, installed packages, or a production build. To run or deploy the app, add the Nyxcord source project separately.
+This distribution contains the complete application source, documentation, and tests. It intentionally excludes `node_modules`, credentials, and the generated `dist` build. Upload the contents of the `Nyxcord/` folder to the root of your GitHub repository.
 
 ## What it does
 
@@ -11,9 +11,25 @@ This repository's **documentation-only distribution** contains `README.md`, `HAN
 - Rotate in 90-degree steps while keeping crop selection accessible.
 - Trim a video or animated GIF; select a single frame for a static sticker.
 - Resize directly in the Resize tab using Width, Height, the scale slider, or the corner handle. Changes update the output preview immediately. The crop stays unchanged and upscaling beyond native pixels is blocked.
+- Add multiple editable text layers with an on-canvas text box, drag-to-move text body and eight resize handles (corners scale text; edges change the box dimensions). Font search includes common system fonts, a curated on-demand Google Fonts catalog, browser-permitted installed fonts, and imported TTF/OTF/WOFF/WOFF2 files.
+- Style text with size, bold/italic/underline, color, outline, shadow, background, rotation and custom appearance times on animations.
 - Generate a GIF or sticker, display the **encoded result** inside the editor, and download it using the format dropdown.
 - Create animated sticker outputs as GIF or APNG where supported. Animated APNG uses a `.png` extension; a `.png` filename alone does not prove it contains animation.
 - Attempt automatic sticker compression under **512,000 bytes**. Complex source material may require lower FPS, fewer colors, or a smaller resolution; a passing size alone does not guarantee acceptance by Discord.
+
+
+## Text editor (October 2026)
+
+1. Upload an image, animated GIF, or video, and select **Text** in the editor toolbar.
+2. Click **Add text**. An editable text box appears on the image. New layers are ready for typing; afterward double-click a text box to edit it. Multiline text and manual line breaks are supported. No large `TEXT` badge is drawn over the actual text.
+3. Click once to select a layer, then **drag directly on its text** to move it. Drag any **corner** to scale the text and box proportionally, or a **side** to change only the box width or height without changing font size. The opposite edge stays anchored where canvas bounds permit. Click empty canvas space to hide the border and handles. Adjust **Text box width (%)** or **Text box height (%)** in Text Properties for precise sizing. An empty height input uses the natural text height. Rotation, font size, and width are also editable numerically in the Text panel.
+4. Open the **Font** selector and type to search. Common OS fonts are available where installed, while the Online group uses on-demand Google Fonts CSS (requires an internet connection). The optional **Find fonts installed on this device** button uses the browser's Local Font Access API if supported and granted; browsers may refuse or omit this API. Use **Import font** for a TTF, OTF, WOFF, or WOFF2 file (maximum 10 MB).
+5. Multiple text layers can be duplicated, reordered, or removed. Outline, shadow, background opacity, bold, italic, underline, rotation, and text alignment remain editable. Animated exports support entire-clip or custom-layer time ranges.
+6. Use Preview or Export. Text is rendered to every applicable output frame before GIF/APNG/PNG encoding. Imported and online fonts are awaited before export; unavailable remote fonts produce a recoverable error rather than silently changing appearance.
+
+**Font availability:** No web editor can preinstall every commercial font or enumerate all system fonts in all browsers. Nyxcord offers a searchable curated catalog, browser-exposed fonts, and local imports instead. Imported fonts are session-scoped.
+
+**Editing vs exporting:** While Text is active, an HTML text input supplies the editable overlay; in other tool modes, the Canvas renderer paints the same layers into the preview. The visual line wrapping may vary slightly between the HTML textarea and Canvas font metrics for complex scripts or very long strings.
 
 ## Interface behavior
 
@@ -65,7 +81,7 @@ The revised website source removes `LOCAL / NO UPLOADS`, `No account required`, 
 
 ## Local development
 
-These commands apply **only after the application source files are present**:
+From the folder containing `package.json`:
 
 ```bash
 npm install
@@ -84,10 +100,10 @@ The development server is supplied by Vite. A successful build emits a `dist/` d
 
 ## Deploying to Vercel
 
-1. Push the full application source to a GitHub repository. A documentation-only ZIP cannot be deployed as the editor.
+1. Push the contents of the `Nyxcord/` source folder to the root of a GitHub repository (including `package.json`, `src/`, and `vite.config.ts`).
 2. Import that repository in Vercel.
 3. Select **Vite** (or allow auto-detection).
-4. Build command: `npm run build`.
+4. Build command: `npm run build` (Vite worker format is `es` to allow code splitting).
 5. Output directory: `dist`.
 6. Deploy after local tests and build pass.
 
@@ -131,3 +147,65 @@ For architecture, handoff notes, code map, testing priorities, and the UI change
 Switch to **Resize**, edit Width or Height, move the scale slider, or drag the preview corner. The image keeps its selected crop while the output pixel dimensions change. **Export settings** displays the current dimensions and links to the same Resize controls. The final export uses those dimensions unless automatic sticker compression must further reduce them to meet its size limit.
 
 Run `npm test` for the new resize regression checks and the existing suites.
+
+## Text Tool
+
+Select **Text** after opening an image, GIF, or video. Use **Add text** to create an editable layer.
+
+- Add, select, duplicate, reorder, and delete layers.
+- Drag a selected layer on the output preview. Use arrow keys to move it one output pixel (Shift + arrow keys: 10 pixels).
+- Edit the font family, font size, bold, italic, underline, color, alignment, and rotation.
+- Configure outline, shadow, and solid/rounded backgrounds from the respective expanders.
+- Import browser-supported `.ttf`, `.otf`, `.woff`, or `.woff2` fonts (10 MB/file limit). These are loaded only for the open page and are not bundled into the site.
+- Animated sources can show a layer for the **entire clip** or for a **custom time range** measured from the beginning of the trimmed export. Static output always displays all non-hidden layers.
+
+Text layers use normalized positions relative to the selected output, so cropping, rotating, and resizing the source do not change the layer's alignment with the final frame. Text is composited into the frame **before** GIF, PNG, or APNG encoding. Fonts must be loaded before export can begin.
+
+### Text implementation
+
+- `src/features/text/types.ts`: data shape and defaults.
+- `src/features/text/textStore.ts`: Zustand layer editor state.
+- `src/features/text/fontRegistry.ts`: runtime font imports and readiness checks.
+- `src/features/text/textRender.ts`: shared canvas renderer for preview and export.
+- `src/components/text/TextPanel.tsx`: editing controls and layer list.
+- `src/components/text/TextOverlay.tsx`: drag and keyboard positioning.
+- `src/styles/text.css`: text tool styles.
+
+### Text Tool tests
+
+After installing dependencies, run `npm test` for the Node regression suite. The suite includes tests for text timing, multiple layers, backgrounds, outlines, rotation, and underline. Browser canvas rendering and TTF import were additionally tested in Chromium; see `TEXT_TOOL_TEST_REPORT.md`.
+
+**Known limits:** font availability varies by platform; an imported font does not survive a page refresh. Very large font faces or complex animations may lengthen export time. The final compressor can reduce resolution when required to meet the sticker-size constraint. The overall production build and full React E2E require verification in a dependency-installed environment.
+
+## Where to find the Text Tool
+
+After uploading an image, GIF, or video, open **Text** in the editor toolbar beside **Crop**, **Trim** (when available), and **Resize**. Choose **Add Text** to create a layer. You can change fonts, import local font files, style the layer, and set animated text durations. The Text panel is deliberately not visible before a media file is selected.
+
+## Custom text colors (October 2026)
+
+The **Text** tab includes one compact formatting row: **Bold, Italic, Underline, Import font**. The searchable font selector and font size remain directly above it. To edit a color, click the swatch or picker button, drag within the saturation/brightness square, or adjust the hue slider. Enter a `#RRGGBB` value directly in the adjacent HEX field; `#RGB` shorthand is accepted when the field loses focus or Enter is pressed. Invalid input does not replace the current applied color. The palette includes presets and up to eight recent colors for the current page session.
+
+The custom picker is used for **text fill, outline, shadow, and background**. Pointer changes are batched through `requestAnimationFrame`; while the Text tool is active, media canvas redraw is decoupled from text-layer style changes. Text updates still render directly in the editable HTML overlay, and final GIF/APNG/PNG exports use the existing Canvas text renderer.
+
+**Release verification:** Run `npm test` and `npm run build` and perform a full browser test of color dragging, numeric HEX edits, switching selected text layers, font imports, animated text, export preview, and download before publishing. Prior successful source-level checks alone do not imply a verified full React E2E or Vercel deployment.
+
+
+## October 2026 deep audit and repair
+
+Historical audit reports are intentionally omitted from this source patch. Source-level fixes include invalidating exports after settings/text edits, cleaning up imported fonts, preventing stale font-selection callbacks, optimizing long-line wraps, and bounding Text layers. Added one Node regression script (`npm test` now executes 15 scripts) and optional real Chromium Canvas/media tests.
+
+**Release caution:** This archive was not verified with `npm ci`, full TypeScript checking, Vite production build, or bundled React E2E in the audit environment, because npm registry access was unavailable and the baseline has no lockfile. On an internet-connected computer, run `npm install`, commit the generated `package-lock.json`, then run `npm ci`, `npm test`, `npm run typecheck`, `npm run build`, and complete browser E2E before production release.
+
+## 2026-10-26 — P1/P2 design and accessibility improvements
+
+This update follows Taste Skill, Anti-Slop and Impeccable design principles without changing Nyxcord branding or media/export code.
+
+- On narrower screens, Crop / Trim / Resize / Text use four equally sized tabs (three tabs for static images). The toolbar remains visible without horizontal scrolling.
+- Text's move, width and scale grips have 44 × 44 px pointer targets. Move and resize also work with arrow keys; Shift uses larger steps. Keyboard resizing is announced to assistive technology.
+- Upload instructions are easier to read. Upload activation is disabled while a file is opening and progress is announced.
+- Color palette uses one swatch trigger and editable HEX field. Incorrect HEX input stays visible with an error instead of silently resetting. Native range inputs provide keyboard access to saturation and brightness, alongside the existing hue slider and pointer-draggable palette.
+- The color callback uses the latest external value rather than a stale initial render value.
+- Searchable font results show samples for available fonts; online samples are loaded on hover/focus instead of downloading the entire catalog at once.
+- Once media has loaded, the hero is smaller, the workspace title becomes *Editor*, and the supporting copy reflects the Text/Resize tools.
+
+**Checks:** `npm test` runs 16 Node scripts (including `ui-p1-p2.test.cjs`). An isolated Chromium layout fixture was tested at 320–1366 px. `npm run build` is still blocked in this environment by missing `vite/client` typings; packages are not installed and this project contains no lockfile. Do not interpret the isolated CSS test as complete React E2E verification.

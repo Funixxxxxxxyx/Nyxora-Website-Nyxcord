@@ -239,3 +239,27 @@ button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visi
 .canvas-size-summary > div { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #afb2c2; }
 .canvas-size-summary strong { font-size: 14px; color: #f4f4f8; }
 .canvas-size-summary button { font-size: 12px; }
+
+/* P1: Maintain four fully visible, equal-width editor tabs at narrow viewport sizes. */
+@media(max-width:650px){
+  .editor-toolbar{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;min-width:0}
+  .tool-tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%;min-width:0}
+  .tool-tab{min-width:0;min-height:42px;display:flex;align-items:center;justify-content:center;gap:5px;padding:8px 3px;font-size:11px;white-space:nowrap}
+  .tool-tabs svg{width:14px;height:14px}
+  .tool-tip{line-height:1.4}
+}
+@media(max-width:650px){.tool-tabs.three-tabs{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* P1: clearer format guidance; P2: editor-first spacing after media upload. */
+.upload-formats{font-size:12px;line-height:1.55;color:#c5c7d3;text-wrap:balance}
+.upload-zone[aria-busy="true"]{cursor:progress;opacity:.92}
+.upload-zone[aria-busy="true"]:hover{background:#202127;border-color:#686c7a}
+.editor-active.main{padding-top:24px}
+.editor-active .hero{display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:6px 16px;margin-bottom:16px}
+.editor-active .hero h1{font-size:27px;letter-spacing:-1px;line-height:1.15;margin:0}
+.editor-active .hero p{margin:0;font-size:12px}
+@media(max-width:650px){
+  .editor-active.main{padding-top:19px}
+  .editor-active .hero{margin-bottom:12px}
+  .editor-active .hero h1{font-size:24px}
+}

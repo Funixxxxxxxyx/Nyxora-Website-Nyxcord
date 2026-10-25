@@ -7,6 +7,9 @@ import type { Rect } from '../store/editor';
 import { drawProcessed, drawSource, formatTime, seekVideo } from '../lib/media';
 import { drawRotatedView, rotateRect, rotatedSize, unrotateRect } from '../lib/rotation';
 import { exportPlan } from '../lib/exportPlan';
+import { useTextStore } from '../features/text/textStore';
+import { renderTextLayers } from '../features/text/textRender';
+import TextOverlay from './text/TextOverlay';
 import { draggedOutputWidth, resizePreviewGeometry } from '../lib/resizePreview';
 import type { LoadedMedia } from '../lib/media';
 type Handle = 'move' | 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'resize';
@@ -74,6 +77,8 @@ export default function CanvasEditor({ media }: {
     const setPreview = useEditor(s => s.setPreview);
     const resetCrop = useEditor(s => s.resetCrop);
     const rotate = useEditor(s => s.rotate);
+    // Text-mode edits render in the DOM overlay. Do not redraw decoded media for every color drag.
+    const textRevision = useTextStore(s => tool === 'text' ? 0 : s.revision);
     const busy = useEditor(s => ['preparing','rendering','optimizing'].includes(s.exportState));
     const [playing, setPlaying] = useState(false);
     const [focusCrop, setFocusCrop] = useState(false);
@@ -81,7 +86,7 @@ export default function CanvasEditor({ media }: {
     const dimensions = rotatedSize(meta?.width || 1, meta?.height || 1, rotation);
     const rotatedCrop = rotateRect(crop, meta?.width || 1, meta?.height || 1, rotation);
     const resizing = tool === 'resize' && !preview;
-    const outputView = preview || resizing;
+    const outputView = preview || resizing || tool === 'text';
     // Invalid inputs should show a recoverable export error, not crash the editor.
     let plan: ReturnType<typeof exportPlan> | null = null;
     try { if (meta) plan = exportPlan(meta, useEditor.getState()); }
@@ -123,6 +128,13 @@ export default function CanvasEditor({ media }: {
             ctx.save();
             ctx.scale(w / realW, h / realH);
             drawProcessed(ctx, media, crop, time, realW, realH, 'contain', false, rotation);
+            const layers = useTextStore.getState().layers;
+            const clipIsAnimated = meta.kind !== 'image' && (mode === 'gif' || stickerMotion === 'animated');
+            // While editing, real textarea layers sit above the media. Render them to
+            // canvas only outside Text mode to prevent double-rendered letters.
+            if (tool !== 'text') renderTextLayers(ctx,
+                clipIsAnimated ? layers : layers.map(layer => ({ ...layer, timing: 'entire' as const })),
+                clipIsAnimated ? Math.max(0, (time - trimStart) * 1000) : 0, realW, realH);
             ctx.restore();
         }
         else {
@@ -130,7 +142,7 @@ export default function CanvasEditor({ media }: {
                 drawSource(ctx, media, time, x, y, sourceWidth, sourceHeight);
             }, view, meta.width, meta.height, rotation, w, h);
         }
-    }, [media, meta, outputView, outputWidth, outputHeight, crop, rotation, view.x, view.y, view.width, view.height, plan?.width, plan?.height]);
+    }, [media, meta, outputView, outputWidth, outputHeight, crop, rotation, view.x, view.y, view.width, view.height, plan?.width, plan?.height, trimStart, textRevision, mode, stickerMotion, tool]);
     const drawRef = useRef(draw);
     useEffect(() => { drawRef.current = draw; }, [draw]);
     useEffect(() => {
@@ -176,8 +188,19 @@ export default function CanvasEditor({ media }: {
                 time = trimStart + ((now - gifStart.current) / 1000) % duration;
             }
             if (now - lastDraw > 32) { drawRef.current(time); lastDraw = now; }
-            if (now - last > 180) {
-                useEditor.getState().setPlayhead(time);
+            // Update only at actual text visibility boundaries, or the normal 180ms
+            // UI cadence. This keeps timing accurate without rerendering the editor
+            // for every decoded video frame.
+            const current = useEditor.getState();
+            const priorMs = (current.playhead - trimStart) * 1000;
+            const nextMs = (time - trimStart) * 1000;
+            const crossing = current.tool === 'text' &&
+                useTextStore.getState().layers.some(layer => layer.timing === 'custom' &&
+                    [layer.fromMs, layer.toMs].some(boundary => priorMs <= nextMs ?
+                        priorMs < boundary && nextMs >= boundary :
+                        nextMs <= boundary && priorMs > boundary));
+            if (crossing || now - last > 180) {
+                current.setPlayhead(time);
                 last = now;
             }
             raf.current = requestAnimationFrame(loop);
@@ -275,7 +298,11 @@ export default function CanvasEditor({ media }: {
         </div>
       </div>
       <div className="canvas-body">
-        <div className="checkerboard" ref={stage} style={{ width: `min(100%, ${pxWidth}px)`, aspectRatio: String(canvasRatio) }}>
+        <div className="checkerboard" ref={stage} onPointerDownCapture={event => {
+          if (tool === 'text' && event.target instanceof Element && !event.target.closest('.text-edit-box')) {
+            useTextStore.getState().select(null);
+          }
+        }} style={{ width: `min(100%, ${pxWidth}px)`, aspectRatio: String(canvasRatio) }}>
           <canvas className="media-canvas" ref={canvas} aria-label="Editing preview"/>
           {!preview && tool === 'crop' && <>
             <div className="crop-shade" style={{ left: 0, top: 0, width: '100%', height: `${top}%` }}/>
@@ -288,6 +315,7 @@ export default function CanvasEditor({ media }: {
               <span className="crop-size">{Math.round(rotatedCrop.width)} × {Math.round(rotatedCrop.height)}</span>
             </div>
           </>}
+          {!preview && tool === 'text' && !busy && <TextOverlay designWidth={plan?.width ?? outputWidth} designHeight={plan?.height ?? outputHeight}/>}
           {resizing && <div className="resize-guide" aria-label="Resize output frame">
             <span className="resize-label">{outputWidth} × {outputHeight}</span>
             <div className="resize-grip" role="slider" tabIndex={0} aria-label="Drag to resize output"

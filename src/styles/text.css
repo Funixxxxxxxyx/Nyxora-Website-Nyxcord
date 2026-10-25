@@ -1,0 +1,164 @@
+/* Text editing: minimal brutalism; no decorative effects. */
+.text-panel {display:grid;gap:14px}
+.text-add {display:inline-flex;align-items:center;gap:6px;padding:9px 11px}
+.text-empty {margin:0;color:var(--nx-sub);font-size:12px}
+.text-layer-list {display:grid;gap:6px;max-height:240px;overflow-y:auto}
+.text-layer-row {display:flex;gap:3px;align-items:center;border:1px solid #505363;background:#1c1e26;padding:5px}
+.text-layer-row.active {border-color:#8f9aff;background:#303450}
+.text-layer-row>button {border:1px solid transparent;background:transparent;color:#e4e5ed;padding:7px;cursor:pointer}
+.text-layer-row>button:hover:not(:disabled) {background:#45485c}
+.text-layer-row>button:disabled {opacity:.35;cursor:not-allowed}
+.text-layer-select {display:flex;align-items:center;gap:9px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;font-size:12px}
+.text-layer-select span {color:#c6caff;font-weight:800}
+.text-properties {display:grid;gap:12px;border-top:1px solid #555968;padding-top:14px}
+.text-field {display:flex;flex-direction:column;gap:6px;min-width:0;color:#c9ccda;font-size:11px;font-weight:750}
+.text-field input:not([type=color]),.text-field textarea,.text-field select {width:100%;min-width:0;padding:10px;border:1px solid #646879;border-radius:2px;background:#17181e;color:#fff;font:inherit;font-size:13px}
+.text-field textarea {resize:vertical;min-height:65px}
+.text-field input[type=color] {width:100%;height:38px;background:#17181e;border:1px solid #646879;padding:3px;cursor:pointer}
+.text-two-col {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.text-import {display:flex;align-items:center;justify-content:center;gap:7px;min-height:38px;max-width:170px}
+.text-toggle-row {display:flex;flex-wrap:wrap;gap:6px}
+.text-toggle-row button {display:flex;align-items:center;gap:5px;border:1px solid #646879;color:#daddf1;background:#242630;padding:9px 11px;cursor:pointer}
+.text-toggle-row button.selected {border-color:#9ca6ff;background:#5865f2;color:#fff}
+.text-style-details {border:1px solid #555968;background:#22242d;padding:11px}
+.text-style-details summary {cursor:pointer;color:#e2e5f1;font-size:12px;font-weight:700}
+.text-style-details[open] {display:grid;gap:13px}
+.text-style-details .text-two-col,.text-style-details>.text-field {margin-top:10px}
+.text-duration {display:grid;gap:10px}
+.text-error {margin:0;color:#ffc0b2;font-size:11px;grid-column:1 / -1}
+/* Canvas text editor. The textarea is the text: no floating "TEXT" label. */
+.checkerboard {position:relative}
+.text-overlay {position:absolute;inset:0;pointer-events:none;overflow:visible;z-index:4}
+.text-edit-box {position:absolute;pointer-events:auto;min-width:20px;min-height:14px;isolation:isolate;
+  display:flex;align-items:center;box-sizing:border-box}
+.text-edit-background {position:absolute;inset:0;z-index:-1;pointer-events:none}
+/* Selection is deliberate: unselected text has no visible edit chrome. */
+.text-edit-input {display:block;width:100%;min-height:1em;resize:none;overflow:hidden;border:0;
+  outline:none;background:transparent;white-space:pre-wrap;overflow-wrap:anywhere;box-sizing:border-box;
+  font-synthesis:weight style;letter-spacing:normal;user-select:none;cursor:grab;touch-action:none}
+.text-edit-box:not(.editing):not(.locked):active .text-edit-input{cursor:grabbing}
+.text-edit-box.active:not(.editing)::after {content:"";position:absolute;inset:0;
+  border:1px dashed #9aa5ff;pointer-events:none;z-index:2}
+.text-edit-box.editing::after{content:"";position:absolute;inset:0;border:1px solid #f2f3ff;
+  pointer-events:none;z-index:2}
+.text-edit-box.editing .text-edit-input {cursor:text;user-select:text;touch-action:auto}
+.text-edit-input:focus-visible {outline:2px solid #a8b0ff;outline-offset:2px}
+.text-edit-box.editing .text-edit-input:focus {outline:none}
+.text-edit-input::placeholder {color:#b2b5ca;opacity:.9;-webkit-text-stroke:0}
+.text-edit-box.locked .text-edit-input{cursor:default}
+/* Selection controls are absent when deselected. All 8 targets are touch-friendly. */
+.text-corner-grip {position:absolute;z-index:5;width:44px;height:44px;display:grid;place-items:center;
+  border:0;background:transparent;padding:0;touch-action:none;user-select:none}
+.text-corner-grip::after{content:"";width:11px;height:11px;background:#f3f4ff;border:2px solid #5865f2;
+  box-sizing:border-box;box-shadow:0 1px 3px #0009;pointer-events:none}
+.text-corner-grip:hover::after,.text-corner-grip:focus-visible::after{background:#bcc4ff}
+.text-corner-grip:focus-visible{outline:2px solid #a7afff;outline-offset:0}
+.text-corner-grip.corner-nw{left:-22px;top:-22px;cursor:nwse-resize}
+.text-corner-grip.corner-ne{right:-22px;top:-22px;cursor:nesw-resize}
+.text-corner-grip.corner-sw{left:-22px;bottom:-22px;cursor:nesw-resize}
+.text-corner-grip.corner-se{right:-22px;bottom:-22px;cursor:nwse-resize}
+.text-editor-hint {margin:0;color:#aeb2c4;font-size:12px;line-height:1.65}
+.font-picker {display:flex;flex-direction:column;gap:6px;min-width:0;position:relative}
+.text-field-title {color:#c9ccda;font-size:11px;font-weight:750}
+.font-picker-trigger {display:flex;align-items:center;justify-content:space-between;gap:6px;
+  width:100%;min-height:38px;padding:8px 10px;border:1px solid #646879;background:#17181e;
+  color:#fff;font-size:12px;text-align:left}
+.font-picker-current {min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.font-picker-menu {position:absolute;top:100%;left:0;right:0;z-index:50;min-width:245px;
+  border:1px solid #7d85b4;background:#20222b;box-shadow:0 12px 25px #000a;padding:7px}
+.font-picker-search {display:flex;align-items:center;gap:7px;padding:0 9px;
+  border:1px solid #666d8c;color:#aab3ff;background:#15171d}
+.font-picker-search input {width:100%;height:38px;outline:none;border:0;background:transparent;color:#fff;font-size:12px}
+.font-picker-results {overflow-y:auto;max-height:230px;padding:5px 0}
+.font-picker-option {width:100%;display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:transparent;color:#e2e4ee;padding:8px;text-align:left;border:0;cursor:pointer}
+.font-picker-option:hover,.font-picker-option:focus-visible {background:#353957}
+.font-option-name {display:block;min-width:0;font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.font-option-name small {display:block;color:#999fb8;font-size:10px;margin-top:2px}
+.font-picker-installed {width:100%;border:1px solid #515671;background:#292c3a;color:#d3d8fb;
+  padding:9px;text-align:left;font-size:11px;cursor:pointer}
+.font-picker-installed:hover {background:#343b5a}
+.font-picker-empty,.font-picker-more {margin:0;padding:9px;color:#aab1c6;font-size:11px;line-height:1.5}
+@media(max-width:530px){.text-two-col{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .text-layer-row>button{padding:5px}.text-layer-select{font-size:11px}.text-panel{padding:12px}
+  .font-picker-menu{min-width:210px}}
+
+/* Compact text formatting alongside font import. */
+.text-format-toolbar{display:flex;align-items:stretch;gap:9px;flex-wrap:wrap}
+.text-format-toolbar .text-toggle-row{display:flex;gap:5px;flex:0 0 auto}
+.text-format-toolbar .text-toggle-row button{min-width:36px;min-height:38px;justify-content:center;padding:8px 10px;font-size:14px}
+.text-format-toolbar .text-import{flex:1 1 112px;max-width:none;white-space:nowrap;min-width:112px;font-size:12px;padding:8px}
+.text-color-align{position:relative}
+
+/* HSV palette: gradients are functional controls rather than page decoration. */
+.nx-color-picker{display:flex;flex-direction:column;gap:6px;min-width:0;position:relative}
+.nx-color-inline{display:flex;align-items:center;gap:5px;min-width:0}
+.nx-color-swatch,.nx-color-expand{height:38px;border:1px solid #646879;background:#242630;color:#d8daeb;cursor:pointer}
+.nx-color-swatch{display:flex;align-items:center;gap:6px;padding:5px;flex:0 0 auto}
+.nx-color-swatch>span{display:block;width:23px;height:26px;border:1px solid #a2a5b8}
+.nx-color-expand{display:grid;place-items:center;min-width:35px;flex:0 0 35px}
+.nx-color-hex{width:100%;height:38px;min-width:0;padding:7px 9px;border:1px solid #646879;border-radius:2px;
+  background:#17181e;color:#fff;font-size:12px;font-family:ui-monospace,monospace;text-transform:uppercase}
+.nx-color-hex:focus-visible,.nx-color-swatch:focus-visible,.nx-color-expand:focus-visible,
+.nx-color-presets button:focus-visible,.nx-color-hue:focus-visible{outline:2px solid #a7afff;outline-offset:2px}
+.nx-color-panel{position:absolute;left:0;top:100%;width:min(282px,calc(100vw - 48px));max-width:none;z-index:60;
+  border:1px solid #8993d5;background:#22242d;box-shadow:0 13px 30px #000b;padding:12px;display:grid;gap:12px}
+.nx-color-area{height:148px;width:100%;position:relative;cursor:crosshair;touch-action:none;user-select:none;outline-offset:2px}
+.nx-color-area:focus-visible{outline:2px solid #a7afff}
+.nx-color-area-white,.nx-color-area-black{position:absolute;inset:0;pointer-events:none}
+.nx-color-area-white{background:linear-gradient(to right,#fff,transparent)}
+.nx-color-area-black{background:linear-gradient(to top,#000,transparent)}
+.nx-color-area-cursor{position:absolute;pointer-events:none;width:14px;height:14px;border:2px solid white;border-radius:50%;
+  transform:translate(-50%,-50%);box-shadow:0 0 0 1px #0008}
+.nx-color-hue-row{display:flex;align-items:center;gap:10px}
+.nx-color-hue{appearance:none;-webkit-appearance:none;height:14px;flex:1;min-width:0;border-radius:0;
+  background:linear-gradient(to right,red,#ff0,#0f0,#0ff,#00f,#f0f,red);cursor:pointer}
+.nx-color-hue::-webkit-slider-thumb{appearance:none;width:11px;height:22px;border:2px solid white;
+  box-shadow:0 0 0 1px #161722;background:transparent;border-radius:2px}
+.nx-color-hue::-moz-range-thumb{width:11px;height:22px;border:2px solid white;border-radius:2px;background:transparent}
+.nx-color-current{width:28px;height:27px;border:1px solid #8b91a8;flex:0 0 28px}
+.nx-color-presets{display:flex;flex-wrap:wrap;gap:7px}
+.nx-color-presets button{width:25px;height:25px;border:1px solid #83889f;cursor:pointer;display:grid;place-items:center;padding:0}
+.nx-color-presets button.is-active{outline:2px solid #a5aeff;outline-offset:2px}
+.nx-color-recent{display:grid;gap:7px;border-top:1px solid #454958;padding-top:10px}
+.nx-color-recent>span{font-size:11px;color:#b8bdcd}
+@media(max-width:530px){.text-format-toolbar{gap:6px}.text-format-toolbar .text-import{min-width:105px}}
+
+/* Keep palettes inside the right edge for the second column on narrow screens. */
+.text-two-col > .nx-color-picker:nth-child(2) .nx-color-panel{left:auto;right:0}
+@media(max-width:380px){.nx-color-panel{width:min(252px,calc(100vw - 34px))}}
+
+/* Limit scrollbar/palette overflow on small devices while retaining readable labels. */
+@media(max-width:380px){.font-picker-menu{min-width:0;width:min(100%,270px)}.text-color-align{min-width:0}}
+
+/* P2: one color trigger, explicit HEX validity, accessible HSV axis controls. */
+.nx-color-error{font-size:11px;color:#ffc4b6;line-height:1.45}
+.nx-color-hex[aria-invalid="true"]{border-color:#ff9f91;outline-color:#ff9f91}
+.nx-color-swatch{min-width:44px;min-height:44px;justify-content:center}
+.nx-color-hex{height:44px}
+.nx-color-axes{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.nx-color-axes label{display:grid;gap:5px;min-width:0;font-size:11px;color:#c5c9dd}
+.nx-color-axes input[type=range]{min-width:0;width:100%;accent-color:#909aff;cursor:pointer}
+.nx-color-axes input:focus-visible{outline:2px solid #a7afff;outline-offset:3px}
+/* Readable swatches without downloads for online families that are not loaded yet. */
+.font-option-name{flex:1 1 auto}
+.font-option-preview{flex:0 0 46px;min-width:46px;font-size:20px;line-height:1.15;white-space:nowrap;text-align:right;color:#f7f7ff}
+.font-option-preview.unavailable{color:#aab0c5;font-family:ui-sans-serif,system-ui,sans-serif;font-size:9px;line-height:1.2;max-width:56px}
+.font-picker-option.is-selected{background:#343b5b}
+.font-picker-option:focus-visible{outline:2px solid #a7afff;outline-offset:-2px}
+
+/* Give editable HEX values a full row on very narrow phones; keep number fields in columns. */
+@media(max-width:420px){.text-color-grid>.nx-color-picker{grid-column:1 / -1}}
+
+/* Four edge handles change the box dimensions independently of font size. */
+.text-side-grip{position:absolute;z-index:5;display:grid;place-items:center;
+  width:44px;height:44px;padding:0;border:0;background:transparent;touch-action:none;user-select:none}
+.text-side-grip::after{content:"";display:block;width:14px;height:7px;background:#f3f4ff;
+  border:2px solid #5865f2;box-sizing:border-box;box-shadow:0 1px 3px #0009;pointer-events:none}
+.text-side-grip:hover::after,.text-side-grip:focus-visible::after{background:#bcc4ff}
+.text-side-grip:focus-visible{outline:2px solid #a7afff;outline-offset:0}
+.text-side-grip.side-n{left:50%;top:-22px;transform:translateX(-50%);cursor:ns-resize}
+.text-side-grip.side-s{left:50%;bottom:-22px;transform:translateX(-50%);cursor:ns-resize}
+.text-side-grip.side-w{left:-22px;top:50%;transform:translateY(-50%);cursor:ew-resize}
+.text-side-grip.side-e{right:-22px;top:50%;transform:translateY(-50%);cursor:ew-resize}
+.text-side-grip.side-w::after,.text-side-grip.side-e::after{width:7px;height:14px}

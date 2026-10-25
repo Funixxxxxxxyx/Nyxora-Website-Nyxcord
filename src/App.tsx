@@ -13,6 +13,8 @@ import type { AnimatedExportFormat } from './lib/export';
 import type { ExportResult } from './store/editor';
 import { clearLegacyDraft } from './lib/session';
 import { useEditor } from './store/editor';
+import { useTextStore } from './features/text/textStore';
+import { resetImportedFonts } from './features/text/fontRegistry';
 const ACCEPT = '.mp4,.mov,.m4v,.webm,.ogv,.gif,.png,.jpg,.jpeg,.webp,.bmp,.avif';
 export default function App() {
     const input = useRef<HTMLInputElement>(null);
@@ -35,6 +37,8 @@ export default function App() {
     useEffect(() => {
         clearLegacyDraft();
         useEditor.getState().resetSession();
+        useTextStore.getState().reset();
+        resetImportedFonts();
         const onReturn = (event: PageTransitionEvent) => {
             if (!event.persisted) return;
             // Reset the restored DOM in place instead of navigating again.
@@ -50,6 +54,8 @@ export default function App() {
             setNotice(null);
             if (input.current) input.current.value = '';
             useEditor.getState().resetSession();
+            useTextStore.getState().reset();
+            resetImportedFonts();
         };
         window.addEventListener('pageshow', onReturn);
         return () => window.removeEventListener('pageshow', onReturn);
@@ -59,8 +65,37 @@ export default function App() {
         disposeMedia(mediaRef.current);
         for (const result of resultCache.current.values()) URL.revokeObjectURL(result.url);
         resultCache.current.clear();
+        resetImportedFonts();
     }, []);
-    const openFile = () => input.current?.click();
+    // An output is a snapshot of the media, settings and text at export time.
+    // Reject stale downloads and cancel in-flight exports if that snapshot changes.
+    useEffect(() => {
+        const invalidate = () => {
+            const old = useEditor.getState();
+            if (!controller.current && resultCache.current.size === 0 && !old.result) return;
+            controller.current?.abort();
+            controller.current = null;
+            setWorking(false);
+            clearResults();
+            useEditor.getState().setResult(null);
+        };
+        const textUnsubscribe = useTextStore.subscribe((next, previous) => {
+            if (next.revision !== previous.revision) invalidate();
+        });
+        const editorUnsubscribe = useEditor.subscribe((next, previous) => {
+            const changed = next.meta !== previous.meta || next.crop !== previous.crop ||
+              next.rotation !== previous.rotation || next.outputWidth !== previous.outputWidth ||
+              next.outputHeight !== previous.outputHeight || next.mode !== previous.mode ||
+              next.stickerMotion !== previous.stickerMotion || next.trimStart !== previous.trimStart ||
+              next.trimEnd !== previous.trimEnd || next.fpsMode !== previous.fpsMode ||
+              next.qualityMode !== previous.qualityMode || next.sizeTargetMB !== previous.sizeTargetMB ||
+              (next.mode === 'sticker' && next.stickerMotion === 'static' &&
+                next.meta?.kind !== 'image' && next.playhead !== previous.playhead);
+            if (changed) invalidate();
+        });
+        return () => { textUnsubscribe(); editorUnsubscribe(); };
+    }, []);
+    const openFile = () => { if (!loading) input.current?.click(); };
     const selectFile = async (file?: File) => {
         if (!file)
             return;
@@ -78,6 +113,8 @@ export default function App() {
             mediaRef.current = loaded;
             setMedia(loaded);
             clearResults();
+            useTextStore.getState().reset();
+            resetImportedFonts();
             useEditor.getState().setMeta(loaded.meta);
         }
         catch (e) {
@@ -169,18 +206,24 @@ export default function App() {
     <header className="site-header">
       <div className="site-brand"><BrandMark /><span>Nyxcord</span></div>
     </header>
-    <main className="main">
+    <main className={`main ${media ? 'editor-active' : ''}`}>
       <div className="hero">
         <h1>GIFs &amp; stickers<span>.</span></h1>
-        <p>Crop, trim, and export.</p>
+        <p>Crop, resize, add text, and export.</p>
       </div>
       <div className="workspace">
-        <div className="workspace-title"><div><span className="workspace-icon"><Crop size={18}/></span><span>GIF & Sticker Maker</span></div></div>
+        <div className="workspace-title"><div><span className="workspace-icon"><Crop size={18}/></span><span>{media ? 'Editor' : 'GIF & Sticker Maker'}</span></div></div>
         <div className="workspace-content">
           <input ref={input} className="sr-only" type="file" accept={ACCEPT} onChange={e => void selectFile(e.target.files?.[0])}/>
-          {!media ? <div className={`upload-zone ${dragOver ? 'drag-over' : ''}`} onClick={openFile} role="button" tabIndex={0} aria-label="Choose an image or video" onKeyDown={e => { if (e.target !== e.currentTarget) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFile(); } }} onDragOver={e => { e.preventDefault(); setDragOver(true); }} onDragLeave={e => { e.preventDefault(); setDragOver(false); }} onDrop={e => { e.preventDefault(); setDragOver(false); void selectFile(e.dataTransfer.files?.[0]); }}>
+          {!media ? <div className={`upload-zone ${dragOver && !loading ? 'drag-over' : ''}`} onClick={openFile}
+                role="button" tabIndex={loading ? -1 : 0} aria-disabled={loading} aria-busy={loading}
+                aria-label="Choose an image or video"
+                onKeyDown={e => { if (loading || e.target !== e.currentTarget) return; if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFile(); } }}
+                onDragOver={e => { e.preventDefault(); if (!loading) setDragOver(true); }}
+                onDragLeave={e => { e.preventDefault(); setDragOver(false); }}
+                onDrop={e => { e.preventDefault(); setDragOver(false); if (!loading) void selectFile(e.dataTransfer.files?.[0]); }}>
               <div className="upload-art"><div className="upload-art-ring"><CloudUpload size={30} strokeWidth={1.8}/></div></div>
-              <h2>{loading ? 'Opening media…' : 'Drop an image or video'}</h2>
+              <h2 role={loading ? 'status' : undefined} aria-live="polite">{loading ? 'Opening media…' : 'Drop an image or video'}</h2>
               <button type="button" className="button button-primary upload-button" disabled={loading} onClick={e => { e.stopPropagation(); openFile(); }}><Upload size={15}/> Choose File <ArrowRight size={15}/></button>
               <span className="upload-formats">MP4, WebM, MOV, GIF, PNG, JPG, WebP · Up to 160 MB</span>
             </div> : <>

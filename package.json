@@ -8,7 +8,7 @@
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
     "typecheck": "tsc --noEmit",
-    "test": "node tests/audit.test.cjs && node tests/export.test.cjs && node tests/compression.test.cjs && node tests/worker.test.cjs && node tests/session-download.test.cjs && node tests/regression-p0.test.cjs && node tests/deep-fixes.test.cjs && node tests/apng-stream.test.cjs && node tests/repair-regression.test.cjs && node tests/stability-repair.test.cjs && node tests/resize-functional.test.cjs"
+    "test": "node tests/audit.test.cjs && node tests/export.test.cjs && node tests/compression.test.cjs && node tests/worker.test.cjs && node tests/session-download.test.cjs && node tests/regression-p0.test.cjs && node tests/deep-fixes.test.cjs && node tests/apng-stream.test.cjs && node tests/repair-regression.test.cjs && node tests/stability-repair.test.cjs && node tests/resize-functional.test.cjs && node tests/text-tool.test.cjs && node tests/text-editing.test.cjs && node tests/text-color-picker.test.cjs && node tests/deep-audit-2026.test.cjs && node tests/ui-p1-p2.test.cjs && node tests/text-four-corner.test.cjs && node tests/text-eight-handles.test.cjs"
   },
   "dependencies": {
     "gifenc": "^1.0.3",

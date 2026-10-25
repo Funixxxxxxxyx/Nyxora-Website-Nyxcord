@@ -1,6 +1,7 @@
-import { Crop, RotateCcw, Scissors, ShieldCheck, SlidersHorizontal } from 'lucide-react';
+import { Crop, RotateCcw, Scissors, ShieldCheck, SlidersHorizontal, Type } from 'lucide-react';
 import { useShallow } from 'zustand/react/shallow';
 import CropSizeFields from './CropSizeFields';
+import TextPanel from './text/TextPanel';
 import CanvasSizeFields from './CanvasSizeFields';
 import FramePicker from './FramePicker';
 import Timeline from './Timeline';
@@ -14,6 +15,7 @@ const tools = [
   { id: 'crop', label: 'Crop', icon: Crop },
   { id: 'trim', label: 'Trim', icon: Scissors },
   { id: 'resize', label: 'Resize', icon: SlidersHorizontal },
+  { id: 'text', label: 'Text', icon: Type },
 ] as const satisfies ReadonlyArray<{ id: Tool; label: string; icon: typeof Crop }>;
 
 export default function EditorControls({ media }: { media: LoadedMedia }) {
@@ -30,7 +32,7 @@ export default function EditorControls({ media }: { media: LoadedMedia }) {
 
   return <fieldset className="controls-fieldset" disabled={busy}>
     <div className="editor-toolbar">
-      <div className="tool-tabs">
+      <div className={`tool-tabs ${media.meta.kind === 'image' ? 'three-tabs' : ''}`}>
         {tools.map(({ id, label, icon: Icon }) => {
           if (id === 'trim' && media.meta.kind === 'image') return null;
           return <button key={id} type="button" className={`tool-tab ${store.tool === id ? 'selected' : ''}`}
@@ -40,7 +42,7 @@ export default function EditorControls({ media }: { media: LoadedMedia }) {
         })}
       </div>
       <span className="tool-tip">{store.tool === 'crop' ? 'DRAG TO CROP' : store.tool === 'trim'
-        ? staticFrame ? 'SELECT ONE FRAME' : 'SELECT TIME RANGE' : 'OUTPUT SIZE'}</span>
+        ? staticFrame ? 'SELECT ONE FRAME' : 'SELECT TIME RANGE' : store.tool === 'resize' ? 'OUTPUT SIZE' : 'TEXT LAYERS'}</span>
     </div>
 
     {store.tool === 'crop' && <div className="tool-panel crop-panel">
@@ -59,6 +61,8 @@ export default function EditorControls({ media }: { media: LoadedMedia }) {
     </div>}
 
     {store.tool === 'trim' && (staticFrame ? <FramePicker media={media}/> : <Timeline media={media}/>)}
+
+    {store.tool === 'text' && <TextPanel/>}
 
     {store.tool === 'resize' && <div id="nyx-resize-panel" className="tool-panel resize-panel">
       <div className="panel-heading"><span><SlidersHorizontal size={16}/> Canvas size</span>

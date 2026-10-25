@@ -21,7 +21,8 @@ process.stdout.write(js);
     result = subprocess.check_output(
         ['node', '-e', code, str(ROOT / 'src' / 'lib' / f'{name}.ts')], cwd=ROOT
     ).decode()
-    return result.replace("import { inspectAnimation } from './validateOutput';", '') \
+    return result.replace("import { inspectAnimation, pngCrc } from './validateOutput';", '') \
+        .replace("import { inspectAnimation } from './validateOutput';", '') \
         .replace('export function ', 'function ') \
         .replace('export async function ', 'async function ')
 

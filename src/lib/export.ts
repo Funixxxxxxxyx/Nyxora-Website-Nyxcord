@@ -3,6 +3,9 @@ import { effectiveQuality, useEditor } from '../store/editor';
 import type { LoadedMedia } from './media';
 import { drawProcessed, seekVideo } from './media';
 import { exportPlan } from './exportPlan';
+import { useTextStore } from '../features/text/textStore';
+import { renderTextLayers } from '../features/text/textRender';
+import { waitForTextFonts } from '../features/text/fontRegistry';
 import { compressionRecipes, pngRecipes } from './compressionStrategy';
 import { inspectAnimation } from './validateOutput';
 import { validateDecodedOutput } from './decodeValidation';
@@ -23,6 +26,11 @@ function createEncoder(job: EncodeJob, signal: AbortSignal) {
   let pending: { index: number; resolve(): void; reject(error: Error): void } | null = null;
   const ready = new Promise<void>((resolve, reject) => { readyResolve = resolve; readyReject = reject; });
   const result = new Promise<EncodeResult>((resolve, reject) => { resultResolve = resolve; resultReject = reject; });
+  let timeout: ReturnType<typeof setTimeout>;
+  const watchdog = () => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => fail(new Error('Encoder made no progress. Try a shorter clip.')), 45000);
+  };
   const cleanup = () => { clearTimeout(timeout); signal.removeEventListener('abort', onAbort); worker.terminate(); };
   const fail = (error: Error) => {
     if (settled) return;
@@ -34,13 +42,14 @@ function createEncoder(job: EncodeJob, signal: AbortSignal) {
     cleanup();
   };
   const onAbort = () => fail(cancelled());
-  const timeout = setTimeout(() => fail(new Error('Encoder timed out. Try a shorter clip.')), 30000);
+  watchdog();
   signal.addEventListener('abort', onAbort, { once: true });
   worker.onerror = () => fail(new Error('The encoder stopped unexpectedly. Try a smaller clip.'));
   worker.onmessage = ({ data }: MessageEvent<EncodeWorkerEvent>) => {
     if (settled || data.id !== job.id) return;
-    if (data.type === 'ready') readyResolve();
+    if (data.type === 'ready') { watchdog(); readyResolve(); }
     if (data.type === 'ack' && pending && data.index === pending.index) {
+      watchdog();
       pending.resolve(); pending = null;
     }
     if (data.type === 'error') fail(new Error(data.error));
@@ -61,6 +70,7 @@ function createEncoder(job: EncodeJob, signal: AbortSignal) {
       if (settled || pending) throw new Error('Encoder cannot accept another frame.');
       await new Promise<void>((resolve, reject) => {
         pending = { index, resolve, reject };
+        watchdog();
         worker.postMessage({ type: 'frame', id: job.id, index, frame, delayMs } satisfies EncodeMessage, [frame]);
       });
     },
@@ -107,8 +117,16 @@ export async function renderMedia(
 ): Promise<ExportResult> {
   const started = performance.now();
   const settings = useEditor.getState();
+  const textLayers = useTextStore.getState().layers.map(layer => ({ ...layer }));
+  const usedLayers = textLayers.filter(layer => !layer.hidden && layer.text.trim());
+  await waitForTextFonts(usedLayers.map(layer => layer.fontFamily), signal);
+  for (const layer of usedLayers) {
+    if (layer.timing === 'custom' && layer.toMs <= layer.fromMs)
+      throw new Error('Text duration end must be later than start.');
+  }
   const plan = exportPlan(media.meta, settings);
   const { width, height, frameCount, maxBytes, frameDuration, sticker, animated, duration } = plan;
+  const overlayLayers = animated ? textLayers : textLayers.map(layer => ({ ...layer, timing: 'entire' as const }));
   const type: EncodeJob['type'] = sticker && !animated ? 'png' : sticker ? animatedStickerFormat : 'gif';
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d', { alpha: true, willReadFrequently: true });
@@ -144,6 +162,7 @@ export async function renderMedia(
         if (decoder) await seekVideo(decoder, settings.playhead, signal);
         drawProcessed(ctx, source, settings.crop, settings.playhead,
           candidateWidth, candidateHeight, 'contain', false, settings.rotation);
+        renderTextLayers(ctx, overlayLayers, 0, candidateWidth, candidateHeight, width, height);
         let blob: Blob | null;
         if (candidate.colors === 0) {
           blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
@@ -192,8 +211,11 @@ export async function renderMedia(
             drawProcessed(ctx, source, settings.crop, timestamp, candidateWidth,
               candidateHeight, 'contain', false, settings.rotation);
           }
+          if (attempt === 0 && cachedFrames)
+            cachedFrames.push(ctx.getImageData(0, 0, candidateWidth, candidateHeight).data.buffer.slice(0));
+          renderTextLayers(ctx, overlayLayers, animated ? (timestamp - settings.trimStart) * 1000 : 0,
+            candidateWidth, candidateHeight, width, height);
           const raw = ctx.getImageData(0, 0, candidateWidth, candidateHeight).data.buffer;
-          if (attempt === 0 && cachedFrames) cachedFrames.push(raw.slice(0));
           await encoder!.push(raw, i, delays[i]);
           progress(Math.min(95, Math.round((attempt + (i + 1) / indices.length) / candidates.length * 95)),
             `${attempt > 0 ? 'Optimizing' : 'Encoding'} ${i + 1}/${indices.length}`);
