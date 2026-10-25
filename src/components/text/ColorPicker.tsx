@@ -49,12 +49,10 @@ export default function ColorPicker({ label, value, onChange }: Props) {
     if (pending.current && safeValue !== pending.current) return;
     setDraft(safeValue);
     setHexError(false);
-    setHsv(old => {
-      const next = hexToHsv(safeValue);
-      if (next.s === 0) next.h = hsvRef.current.h;
-      hsvRef.current = next;
-      return next;
-    });
+    const next = hexToHsv(safeValue);
+    if (next.s === 0) next.h = hsvRef.current.h;
+    hsvRef.current = next;
+    setHsv(next);
   }, [safeValue]);
 
   useEffect(() => () => {

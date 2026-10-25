@@ -2,7 +2,7 @@ import { memo, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties, PointerEvent as ReactPointerEvent, KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useTextStore } from '../../features/text/textStore';
 import type { TextLayer } from '../../features/text/types';
-import { moveTextFromPointer, resizeTextFromSide, scaleTextFromCorner, scaleTextFromPointer } from '../../features/text/textGestures';
+import { moveTextFromPointer, resizeTextFromSide, scaleTextFromPointer } from '../../features/text/textGestures';
 import type { TextCorner, TextSide, TextHandle, TextGestureOrigin } from '../../features/text/textGestures';
 import { useEditor } from '../../store/editor';
 
